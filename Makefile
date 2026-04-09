@@ -2,16 +2,30 @@ CXX = riscv64-unknown-elf-g++
 AS  = riscv64-unknown-elf-g++
 LD  = riscv64-unknown-elf-g++
 
-CFLAGS = -march=rv32im -mabi=ilp32 -ffreestanding -nostdlib -O0 -fno-exceptions -fno-rtti
+# Common flags for 32-bit RISC-V
+ARCH_FLAGS = -march=rv32im -mabi=ilp32
+
+# C++ flags: freestanding, no standard library, no exceptions/RTTI
+CXXFLAGS = $(ARCH_FLAGS) -ffreestanding -nostdlib -fno-exceptions -fno-rtti -O0 -Wall -Wextra
+
+# Linker flags: use our script, no standard files, specify 32-bit emulation
+LDFLAGS = $(ARCH_FLAGS) -T kernel/linker.ld -nostdlib -nostartfiles -Wl,-melf32lriscv
 
 TARGET = kernel.elf
 
 all: $(TARGET)
 
-$(TARGET):
-	$(AS) -c kernel/start.S -o start.o
-	$(CXX) $(CFLAGS) -c kernel/kernel.cpp -o kernel.o
-	$(LD) -T kernel/linker.ld start.o kernel.o -o $(TARGET)
+$(TARGET): start.o uart.o kernel.o
+	$(LD) $(LDFLAGS) start.o uart.o kernel.o -o $(TARGET)
+
+start.o: kernel/start.S
+	$(AS) $(ARCH_FLAGS) -c kernel/start.S -o start.o
+
+uart.o: kernel/uart.cpp kernel/uart.h
+	$(CXX) $(CXXFLAGS) -c kernel/uart.cpp -o uart.o
+
+kernel.o: kernel/kernel.cpp kernel/uart.h
+	$(CXX) $(CXXFLAGS) -c kernel/kernel.cpp -o kernel.o
 
 run: $(TARGET)
 	qemu-system-riscv32 -machine virt -nographic -bios none -kernel $(TARGET)

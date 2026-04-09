@@ -1,17 +1,23 @@
-//to avoid name mangling
+#include "uart.h"
+
+// to avoid name mangling
 extern "C" void kernel_main() {
 
-    // UART: Universal Asynchronous Receiver/Transmitter
-    // initalize a pointer to the UART memory-mapped I/O address
-    volatile char *uart = (volatile char *)0x10000000;
+    // Initialize the UART
+    Uart uart;
 
     // string that will be printed to the UART
-    const char *msg = "Hello world from RISC-V OS!\n";
+    uart.print_str("Hello world from RISC-V OS with a robust UART driver!\n");
 
-    // loop through each character in the string and write it to the UART
-    for (int i = 0; msg[i]; i++) {
-        uart[0] = msg[i];
+    // demonstrating integer printing
+    uart.print_str("Let's count: ");
+    for (int i = 1; i <= 5; i++) {
+        uart.print_int(i);
+        if (i < 5) {
+            uart.print_str(", ");
+        }
     }
+    uart.print_str("\nDone!\n");
 
-    while (1) {} //infinite loop to prevent the kernel from exiting
+    while (1) {} // infinite loop to prevent the kernel from exiting
 }
