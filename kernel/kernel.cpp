@@ -17,6 +17,15 @@ extern "C" void kernel_main() {
             uart.print_str(", ");
         }
     }
+
+    uart.print_str("\nAll hex numbers from 0 to F: ");
+    for (uint32_t n = 0x0; n <= 0xF; n++) {
+        uart.print_hex(n);
+        if (n < 0xF) {
+            uart.print_str(", ");
+        }
+    }
+    
     uart.print_str("\nDone!\n");
 
     while (1) {} // infinite loop to prevent the kernel from exiting

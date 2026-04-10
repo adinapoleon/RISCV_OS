@@ -51,3 +51,19 @@ void Uart::print_int(int32_t n) {
         print_char(buffer[--i]);
     }
 }
+
+void Uart::print_hex(uint32_t n) {
+    // Print 0x prefix
+    print_char('0');
+    print_char('x');
+    
+    // Print 8 hex digits with leading zeros
+    for (int i = 28; i >= 0; i -= 4) {
+        uint8_t digit = (n >> i) & 0xF;
+        if (digit < 10) {
+            print_char(digit + '0');
+        } else {
+            print_char((digit - 10) + 'A');
+        }
+    }
+}

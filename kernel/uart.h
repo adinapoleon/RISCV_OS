@@ -35,6 +35,9 @@ public:
     // Print a 32-bit signed integer
     void print_int(int32_t n);
 
+    // Print a hexadecimal number
+    void print_hex(uint32_t n);
+
 private:
     // Helper to get a pointer to a specific register
     volatile uint8_t* reg(Register r) {
