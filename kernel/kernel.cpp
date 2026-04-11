@@ -25,6 +25,12 @@ extern "C" void kernel_main() {
             uart.print_str(", ");
         }
     }
+
+    // Test 1: exception — illegal instruction
+    uart.print_str("\n--- Testing illegal instruction exception ---\n");
+    asm volatile(".word 0x00000000");
+
+    //add more prints here
     
     uart.print_str("\nDone!\n");
 

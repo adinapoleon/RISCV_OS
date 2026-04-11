@@ -111,16 +111,6 @@ Asynchronous — `mepc` points to the instruction that *would have* executed nex
 | 7    | Machine Timer Interrupt  | `mtime >= mtimecmp` in the CLINT                     |
 | 11   | Machine External Interrupt| PLIC signals an external device (UART, virtio, etc.) |
 
-**Reading `mcause` in C:**
-```cpp
-uint32_t mcause;
-asm volatile("csrr %0, mcause" : "=r"(mcause));
-
-bool is_interrupt  = (mcause >> 31) & 1;
-uint32_t code      = mcause & 0x7FFFFFFF;
-```
-
----
 
 ## `mepc` — Machine Exception Program Counter
 
@@ -132,15 +122,6 @@ Hardware saves the **faulting (or interrupted) PC** here before jumping to `mtve
 | Interrupt  | The instruction that **would have executed next** (none have faulted)|
 
 To return from a trap, you use `mret`, which restores `pc ← mepc`. If you want to skip the faulting instruction (e.g., after handling an `ecall`), you must manually advance it:
-
-```cpp
-// In your C trap handler — advance past a 4-byte instruction
-asm volatile(
-    "csrr t0, mepc\n"
-    "addi t0, t0, 4\n"
-    "csrw mepc, t0\n"
-);
-```
 
 > **Note:** With the Compressed (C) extension, instructions can be 2 bytes. Since your Makefile uses `-march=rv32im` (no C), all instructions are exactly 4 bytes — safe to always add 4.
 
@@ -209,10 +190,6 @@ Bit-mask controlling which *specific* interrupt sources are enabled (in addition
 | 11  | `MEIE` | Machine External Interrupt      |
 
 **Enabling the timer interrupt:**
-```asm
-li   t0, (1 << 7)   # MTIE bit
-csrs mie, t0        # csrs = CSR set bits
-```
 
 ---
 
@@ -266,13 +243,6 @@ For the QEMU `virt` machine, the timer is provided by the **CLINT**, memory-mapp
 | `0x02000000` | 4 bytes | `msip`       | Machine Software Interrupt Pending (write 1 to trigger) |
 | `0x02004000` | 8 bytes | `mtime`      | Current real-time counter (increments at 10 MHz on virt) |
 | `0x02004008` | 8 bytes | `mtimecmp`   | Timer fires when `mtime >= mtimecmp`              |
-
-**Setting a timer interrupt 1 second from now:**
-```cpp
-volatile uint64_t* mtime    = (volatile uint64_t*)0x02004000;
-volatile uint64_t* mtimecmp = (volatile uint64_t*)0x02004008;
-*mtimecmp = *mtime + 10000000; // 10 MHz clock → 1 second
-```
 
 Then enable the timer interrupt in `mie` and `mstatus.MIE`, and your trap handler will fire with `mcause = 0x80000007`.
 
