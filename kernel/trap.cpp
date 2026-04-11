@@ -22,7 +22,13 @@ extern "C" void trap_handler(uint32_t mcause, uint32_t mepc, uint32_t mtval, Tra
         uart.print_hex(mtval);
         uart.print_str("\n");
 
-        uart.print_str("FATAL: unhandled exception, halting.\n");
-        while (true) {}
+        // advace past faulty instruction to prevent infinite loop of exceptions
+        asm volatile(
+            "csrr t0, mepc\n" // read mepc into t0
+            "addi t0, t0, 4\n" // advance to next instruction 
+            "csrw mepc, t0\n"  // write back to mepc
+        );
+
+        return;
     }
 }
