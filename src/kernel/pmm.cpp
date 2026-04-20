@@ -1,4 +1,4 @@
-#include "pmm.h"
+#include "kernel/pmm.h"
 #include <stddef.h>
 
 // Simple bitmap-based physical memory manager implementation

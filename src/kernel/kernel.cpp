@@ -1,5 +1,5 @@
-#include "uart.h"
-#include "pmm.h"
+#include "drivers/uart.h"
+#include "kernel/pmm.h"
 
 extern "C" char _end; // Symbol defined by the linker, marks the end of the kernel code and data 
 

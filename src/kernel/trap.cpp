@@ -1,5 +1,5 @@
-#include "trap.h"
-#include "uart.h"
+#include "kernel/trap.h"
+#include "drivers/uart.h"
 
 extern "C" void trap_handler(uint32_t mcause, uint32_t mepc, uint32_t mtval, TrapFrame* frame) {
     
