@@ -4,46 +4,67 @@ A bare-metal operating system for the RISC-V architecture, targeting the QEMU `v
 
 ---
 
-## Current Progress: Machine-Mode Trap Handler
+## Current Progress: Physical Memory Management
 
-We have implemented a fully working M-mode trap handler on top of the existing UART driver. All traps — exceptions and interrupts — are now caught, diagnosed, and reported over UART.
+We have evolved the kernel from basic hardware interaction to a system capable of managing its own resources. The kernel now includes a robust Physical Memory Manager (PMM) and a clear roadmap for future development.
 
-### Key Features of the Trap Handler:
+### Key Features of the Physical Memory Manager (PMM):
 
-*   **`mtvec` Installation:** On boot, `start.S` loads the address of `trap_entry` into `mtvec` (Machine Trap Vector Register) before calling `kernel_main`, ensuring all traps are caught from the moment the kernel starts.
-*   **Full Register Save/Restore:** The assembly entry point `trap_entry` saves all 31 general-purpose registers (x1–x31) onto the stack as a `TrapFrame` before dispatching to C, and restores them on return. The CPU does not do this automatically.
-*   **C Dispatcher:** `trap_handler()` in `trap.cpp` receives `mcause`, `mepc`, `mtval`, and a pointer to the `TrapFrame`. It decodes the interrupt bit (bit 31 of `mcause`) to distinguish interrupts from exceptions, then prints diagnostic information over UART.
-*   **`mret` Return:** After the C handler returns, the assembly stub restores all registers and executes `mret`, which atomically restores `pc ← mepc`, re-enables interrupts (`MIE ← MPIE`), and restores privilege level from `mstatus`.
-*   **Verified with `IllegalInstruction`:** Tested by emitting a `.word 0x00000000` (guaranteed illegal instruction), which produced the correct output: `cause=0x00000002`, confirming the full pipeline works end-to-end.
+*   **Bitmap-Based Allocation:** Uses a bitmap to track the status of every 4KB page in the 128MB RAM provided by QEMU.
+*   **Linker Integration:** Automatically detects the start of available memory using the `_end` symbol from the linker script, ensuring the kernel never overwrites its own code or static data.
+*   **Page Alignment:** Enforces strict 4KB alignment for all allocated pages, a prerequisite for RISC-V hardware paging (Sv32).
+*   **Self-Protection:** The allocator is "aware" of the memory it uses for its own bitmap and marks those pages as reserved to prevent self-corruption.
+*   **Standard Interface:** Provides a clean `alloc_page()` and `free_page()` API, abstracting the complexity of bit-manipulation from the rest of the kernel.
 
-### How Traps Work on RISC-V (M-mode):
+---
 
-When any trap fires, the hardware automatically:
-1. Saves `pc` → `mepc`
-2. Writes the cause → `mcause` (bit 31 = interrupt flag, low bits = code)
-3. Writes fault info → `mtval` (bad address, faulting instruction, etc.)
-4. Disables interrupts (`mstatus.MIE ← 0`)
-5. Jumps to `mtvec`
+## Step 2: Machine-Mode Trap Handler
 
-Your handler is then responsible for saving registers, dispatching, and returning via `mret`.
+A fully working M-mode trap handler that catches, diagnoses, and reports all hardware exceptions and interrupts.
+
+*   **`mtvec` Installation:** Assembly entry point `trap_entry` is installed on boot.
+*   **Full Context Save:** Saves all 31 general-purpose registers (x1–x31) as a `TrapFrame`.
+*   **C Dispatcher:** Decodes `mcause` to distinguish interrupts from exceptions and prints diagnostics.
+*   **Verified Exceptions:** Tested with Illegal Instruction, Load/Store faults, and Breakpoints.
 
 ---
 
 ## Step 1: Robust UART Driver
 
-The foundation of all kernel output. Moved beyond a raw memory-mapped pointer to a proper object-oriented driver.
+The foundation of all kernel output, providing 16550A-compliant serial communication.
 
-### Key Features:
+*   **Polled I/O:** Uses the Line Status Register (LSR) to ensure hardware readiness.
+*   **Object-Oriented:** Encapsulated in a `Uart` class with support for strings, integers, and hexadecimal output.
 
-*   **16550A Compliance:** Uses standard register naming (RBR, THR, LSR, etc.) as defined in the 16550A specification.
-*   **Busy-Waiting (Polling):** Polls the **Line Status Register (LSR)** bit 5 (**THRE**) to ensure the transmitter is ready before sending each character, preventing character loss.
-*   **Object-Oriented Design:** Encapsulated in a `Uart` class with a clean C++ interface:
-    *   `print_char(char c)`: Core primitive for hardware interaction.
-    *   `print_str(const char* s)`: Null-terminated string output.
-    *   `print_int(int32_t n)`: Custom integer-to-ASCII (no `std` available).
-    *   `print_hex(uint32_t n)`: Hex output with `0x` prefix, used extensively in the trap handler.
-*   **Modern C++ Practices:** Uses `#pragma once` for header guarding and `volatile` pointers for memory-mapped I/O to prevent incorrect compiler optimizations.
-*   **Hardware Initialization:** The `Uart` constructor disables interrupts, enables and clears FIFOs, and sets the 8-n-1 data format.
+---
+
+## Project Roadmap
+
+1.  **Phase 1: Stabilization & S-Mode** (In Progress)
+    - [x] Physical Memory Manager
+    - [ ] Transition from Machine Mode (M) to Supervisor Mode (S)
+    - [ ] Interrupt-driven UART (moving away from polling)
+2.  **Phase 2: Virtual Memory**
+    - [ ] Sv32 Page Table implementation
+    - [ ] Identity mapping for Kernel
+    - [ ] Kernel Heap (kmalloc)
+3.  **Phase 3: Processes & Scheduling**
+    - [ ] Context switching assembly logic
+    - [ ] Timer-based preemption (CLINT)
+    - [ ] Round-robin scheduler
+4.  **Phase 4: User Space**
+    - [ ] `ecall` based System Call interface
+    - [ ] Privilege separation (U-mode)
+    - [ ] Basic `write` and `exit` syscalls
+
+---
+
+## Documentation
+
+Detailed specifications for the hardware components and software abstractions can be found in the `notes/` directory:
+*   `notes/TRAP.md`: Machine-mode trap handling and CSRs.
+*   `notes/UART.md`: 16550A UART register map and initialization.
+*   `notes/MEMORY.md`: Physical and Virtual memory management (Sv32).
 
 ---
 
@@ -54,13 +75,4 @@ Ensure you have the RISC-V GCC toolchain (`riscv64-unknown-elf-g++`) and QEMU (`
 ```bash
 make run
 ```
-
 ---
-
-## Next Steps
-
-- [x] **Step 1: UART Driver** - 16550A-compliant, polled, object-oriented UART driver.
-- [x] **Step 2: Trap & Interrupt Handling** - M-mode trap vector, full register save/restore, C dispatcher, verified with illegal instruction exception.
-- [ ] **Step 3: Physical Memory Management** - Creating a page allocator for dynamic memory.
-- [ ] **Step 4: Supervisor Mode** - Transitioning from Machine Mode to Supervisor Mode via `mret` into S-mode, delegating traps with `medeleg`/`mideleg`.
-- [ ] **Step 5: Timer Interrupt** - Wiring up the CLINT (`mtime`/`mtimecmp`) and handling `mcause=0x80000007`.
