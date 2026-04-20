@@ -22,4 +22,6 @@ SECTIONS
      * used for uninitialized global variables
      */
     .bss : { *(.bss*) *(COMMON) }
+
+    PROVIDE(_end = .); /* Define the _end symbol at the end of the bss section */
 }

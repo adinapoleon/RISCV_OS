@@ -1,5 +1,7 @@
 #include "uart.h"
 
+extern "C" char _end; // Symbol defined by the linker, marks the end of the kernel code and data 
+
 // to avoid name mangling
 extern "C" void kernel_main() {
 
@@ -54,6 +56,36 @@ extern "C" void kernel_main() {
 
     //test if it returns to the main function after handling the interrupt
     uart.print_str("\n\nIf you see this message after the interrupt, it means the kernel successfully handled the interrupt and returned to main.\n");
+
+    // testing memory management by allocating and freeing pages
+    uart.print_str("\n\n--- Testing Physical Memory Manager ---\n");
+
+    // 128 MB is default for QEMU virt
+    uintptr_t ram_end = 0x8000000 + (128 * 1024 * 1024); // 128 MB
+    pmm::init((uintptr_t)&_end, ram_end); // Initialize PMM with memory range after the kernel
+
+    uart.print_str("\nAllocating singe page of memory...\n");
+    void* page1 = pmm::alloc_page();
+    if (page1) {
+        uart.print_str("Allocated page at address: ");
+        uart.print_hex((uintptr_t)page1);
+        uart.print_str("\n");
+    } else {
+        uart.print_str("Failed to allocate page!\n");
+    }
+
+    uart.print_str("\nFreeing the allocated page...\n");
+    pmm::free_page(page1);
+
+    uart.print_str("\nTrying to allocate another page after freeing...\n");
+    void* page2 = pmm::alloc_page();
+    if (page2) {
+        uart.print_str("Allocated page at address: ");
+        uart.print_hex((uintptr_t)page2);
+        uart.print_str("\n");
+    } else {
+        uart.print_str("Failed to allocate page!\n");
+    }
 
     uart.print_str("\nDone!\n");
 
