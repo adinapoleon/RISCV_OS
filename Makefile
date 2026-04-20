@@ -15,8 +15,8 @@ TARGET = kernel.elf
 
 all: $(TARGET)
 
-$(TARGET): start.o uart.o trap.o kernel.o
-	$(LD) $(LDFLAGS) start.o uart.o trap.o kernel.o -o $(TARGET)
+$(TARGET): start.o uart.o trap.o pmm.o kernel.o
+	$(LD) $(LDFLAGS) start.o uart.o trap.o pmm.o kernel.o -o $(TARGET)
 
 start.o: kernel/start.S
 	$(AS) $(ARCH_FLAGS) -c kernel/start.S -o start.o
@@ -27,7 +27,10 @@ uart.o: kernel/uart.cpp kernel/uart.h
 trap.o: kernel/trap.cpp kernel/trap.h
 	$(CXX) $(CXXFLAGS) -c kernel/trap.cpp -o trap.o
 
-kernel.o: kernel/kernel.cpp kernel/uart.h
+pmm.o: kernel/pmm.cpp kernel/pmm.h
+	$(CXX) $(CXXFLAGS) -c kernel/pmm.cpp -o pmm.o
+
+kernel.o: kernel/kernel.cpp kernel/uart.h kernel/pmm.h
 	$(CXX) $(CXXFLAGS) -c kernel/kernel.cpp -o kernel.o
 
 run: $(TARGET)

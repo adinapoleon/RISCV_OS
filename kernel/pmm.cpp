@@ -1,4 +1,5 @@
 #include "pmm.h"
+#include <stddef.h>
 
 // Simple bitmap-based physical memory manager implementation
 namespace pmm {
@@ -9,16 +10,27 @@ namespace pmm {
     static size_t total_pages;     // Total number of pages
 
     // Initialize the physical memory manager with the given memory range
-    void init(uintptr_t start, size_t end) {
-        memory_start = start;
+    void init(uintptr_t start, uintptr_t end) {
+        // Align start to 4KB boundary
+        memory_start = (start + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
         memory_end = end;
         total_pages = (memory_end - memory_start) / PAGE_SIZE;
 
         // Allocate bitmap to track page usage
         size_t bitmap_size = (total_pages + 7) / 8; // 1 bit per page
         bitmap = (uint8_t*)memory_start; // Use the beginning of memory for bitmap
+        
+        // Mark all pages as free initially
         for (size_t i = 0; i < bitmap_size; i++) {
-            bitmap[i] = 0; // Mark all pages as free
+            bitmap[i] = 0;
+        }
+
+        // Mark the pages used by the bitmap itself as allocated
+        size_t bitmap_pages = (bitmap_size + PAGE_SIZE - 1) / PAGE_SIZE;
+        for (size_t i = 0; i < bitmap_pages; i++) {
+            size_t byte_index = i / 8;
+            size_t bit_index = i % 8;
+            bitmap[byte_index] |= (1 << bit_index);
         }
     }
 

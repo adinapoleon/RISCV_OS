@@ -1,4 +1,5 @@
 #include "uart.h"
+#include "pmm.h"
 
 extern "C" char _end; // Symbol defined by the linker, marks the end of the kernel code and data 
 
@@ -61,7 +62,7 @@ extern "C" void kernel_main() {
     uart.print_str("\n\n--- Testing Physical Memory Manager ---\n");
 
     // 128 MB is default for QEMU virt
-    uintptr_t ram_end = 0x8000000 + (128 * 1024 * 1024); // 128 MB
+    uintptr_t ram_end = 0x80000000 + (128 * 1024 * 1024); // 128 MB
     pmm::init((uintptr_t)&_end, ram_end); // Initialize PMM with memory range after the kernel
 
     uart.print_str("\nAllocating singe page of memory...\n");
