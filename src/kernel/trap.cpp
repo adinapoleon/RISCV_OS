@@ -1,6 +1,7 @@
 #include "kernel/trap.h"
 #include "drivers/uart.h"
 
+// for now just print the trap info and advance mepc to avoid infinite traps
 static void advance_mepc() {
     asm volatile(
         "csrr t0, mepc\n"
@@ -18,7 +19,7 @@ static void handle_interrupt(uint32_t code, uint32_t mepc, uint32_t mtval, TrapF
     (void)frame;
     Uart uart;
 
-    switch (code) {
+    switch (static_cast<InterruptCode>(code)) {
         case InterruptCode::MachineSoftwareInterrupt:
             uart.print_str("[INTERRUPT] Machine Software Interrupt\n");
             advance_mepc();
@@ -53,7 +54,7 @@ static void handle_exception(uint32_t code, uint32_t mepc, uint32_t mtval, TrapF
     (void)frame;
     Uart uart;
 
-    switch (code) {
+    switch (static_cast<ExceptionCode>(code)) {
         case ExceptionCode::IllegalInstruction:
             uart.print_str("[EXCEPTION] Illegal Instruction\n");
             advance_mepc();
