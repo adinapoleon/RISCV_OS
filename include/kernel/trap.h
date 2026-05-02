@@ -27,5 +27,8 @@ enum class InterruptCode : uint32_t {
     MachineExternalInterrupt = 11
 };
 
+static void handle_interrupt(uint32_t code, uint32_t mepc, uint32_t mtval, TrapFrame* frame);
+static void handle_exception(uint32_t code, uint32_t mepc, uint32_t mtval, TrapFrame* frame);
+
 //trap dispatcher
 extern "C" void trap_handler(uint32_t mcause, uint32_t mepc, uint32_t mtval, TrapFrame* frame);

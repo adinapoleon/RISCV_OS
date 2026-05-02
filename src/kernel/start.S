@@ -4,14 +4,18 @@
 _start:                     # entry point label
     li sp, 0x84000000       # load immediate, stack pointer initialization  
 
+    # implementing supervisor mode
+    
+
+
     # installing trap vector
     la t0, trap_entry      # load address of trap vector into t0
     csrw mtvec, t0          # write t0 to stvec register (set trap vector base address)
 
     call kernel_main           # call the main kernel function
 
-1:                          #label 1 
-    j 1b                 # jump back to label 1 (infinite loop to prevent exit)
+1:
+    j 1b                  # jump back to label 1 (infinite loop to prevent exit)
 
 # trap entry point
 .global trap_entry
