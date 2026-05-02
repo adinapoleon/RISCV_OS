@@ -13,7 +13,7 @@ static void advance_mepc() {
     );
 }
 
-static void handle_interrupt(uint32_t code, uint32_t mepc, uint32_t mtval, TrapFrame* frame) {
+void handle_interrupt(uint32_t code, uint32_t mepc, uint32_t mtval, TrapFrame* frame) {
     (void)mepc;
     (void)mtval;
     (void)frame;
@@ -48,7 +48,7 @@ static void handle_interrupt(uint32_t code, uint32_t mepc, uint32_t mtval, TrapF
     }
 }
 
-static void handle_exception(uint32_t code, uint32_t mepc, uint32_t mtval, TrapFrame* frame) {
+void handle_exception(uint32_t code, uint32_t mepc, uint32_t mtval, TrapFrame* frame) {
     (void)mepc;
     (void)mtval;
     (void)frame;

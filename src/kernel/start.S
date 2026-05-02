@@ -4,15 +4,44 @@
 _start:                     # entry point label
     li sp, 0x84000000       # load immediate, stack pointer initialization  
 
-    # implementing supervisor mode
-    
-
-
     # installing trap vector
     la t0, trap_entry      # load address of trap vector into t0
     csrw mtvec, t0          # write t0 to stvec register (set trap vector base address)
 
-    call kernel_main           # call the main kernel function
+    # configure Physical Memory Protection
+    li t0, 0xFFFFFFFF     # load immediate, set t0 to 0xFFFFF000 (base address for PMP region)
+    srli t0, t0, 2       # shift right logical by 2 to get the PMP address encoding 
+    csrw pmpaddr0, t0        # write t0 to pmpaddr0 register
+
+    li t0, 0x1F            # load immediate, set t0 to 0x1F (PMP entry 0: RWX permissions)
+    csrw pmpcfg0, t0         # write t0 to pmpcfg0 register 
+
+    # set stvec
+    la t0, supervisor_trap_entry      # load address of trap vector into t0
+    csrw stvec, t0          # write t0 to stvec register (set trap vector base address)
+
+    # set mepc to main function
+    la t0, supervisor_main             # load address of main function into t0
+    csrw mepc, t0                      # write t0 to mepc register (set program counter to main function)
+
+    #update mstatus to set MPP
+    csrr t0, mstatus        # read mstatus register into t0
+    # clear MPP bits (bits 11 and 12) in t0
+    li t1, 0x1800          # load immediate, set t1 to 0x1800 (mask for MPP bits)
+    not t1, t1             # bitwise NOT to get mask for clearing MPP bits
+    and t0, t0, t1          # clear MPP bits in t0
+
+    li t1, 0x0800          # load immediate, set t1 to 0x0800 (value for MPP=01, supervisor mode)
+    or t0, t0, t1           # set MPP bits to 01 (supervisor mode) in t0
+
+    csrw mstatus, t0         # write t0 back to mstatus register (update mstatus with new MPP)
+
+    # mret
+    mret                    # return from machine mode to supervisor mode (jump to main function)
+
+
+
+
 
 1:
     j 1b                  # jump back to label 1 (infinite loop to prevent exit)
@@ -100,3 +129,4 @@ trap_entry:
 
     addi sp, sp, 124      # adjust stack pointer back to original position
     mret                    # return from trap (restore program counter and status) 
+

@@ -17,7 +17,10 @@ enum class ExceptionCode : uint32_t {
     StoreAMOAccessFault = 7,
     EnvironmentCallFromUMode = 8,
     EnvironmentCallFromSMode = 9,
-    EnvironmentCallFromMMode = 11
+    EnvironmentCallFromMMode = 11,
+    InstructionPageFault = 12,
+    LoadPageFault = 13,
+    StoreAMOPageFault = 15
 };
 
 //mcause codes for interrupts
@@ -27,8 +30,8 @@ enum class InterruptCode : uint32_t {
     MachineExternalInterrupt = 11
 };
 
-static void handle_interrupt(uint32_t code, uint32_t mepc, uint32_t mtval, TrapFrame* frame);
-static void handle_exception(uint32_t code, uint32_t mepc, uint32_t mtval, TrapFrame* frame);
+void handle_interrupt(uint32_t code, uint32_t mepc, uint32_t mtval, TrapFrame* frame);
+void handle_exception(uint32_t code, uint32_t mepc, uint32_t mtval, TrapFrame* frame);
 
 //trap dispatcher
 extern "C" void trap_handler(uint32_t mcause, uint32_t mepc, uint32_t mtval, TrapFrame* frame);
