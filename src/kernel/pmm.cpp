@@ -1,4 +1,5 @@
 #include "kernel/pmm.h"
+#include "kernel/mem.h"
 #include <stddef.h>
 
 // Simple bitmap-based physical memory manager implementation
@@ -63,6 +64,15 @@ namespace pmm {
             }
         }
         return nullptr; // No free pages available
+    }
+
+    void* alloc_zeroed_page() {
+        void* page = alloc_page();
+        if (page != nullptr) {
+            mem::zero(page, PAGE_SIZE);
+        }
+
+        return page;
     }
 
     void free_page(void* page) {

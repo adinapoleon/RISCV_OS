@@ -13,7 +13,7 @@ LDFLAGS = $(ARCH_FLAGS) -T scripts/linker.ld -nostdlib -nostartfiles -Wl,-melf32
 
 TARGET = kernel.elf
 
-OBJS = start.o uart.o trap.o pmm.o kernel.o
+OBJS = start.o uart.o trap.o mem.o pmm.o vmm.o kernel.o
 
 all: $(TARGET)
 
@@ -29,10 +29,16 @@ uart.o: src/drivers/uart.cpp include/drivers/uart.h
 trap.o: src/kernel/trap.cpp include/kernel/trap.h include/drivers/uart.h
 	$(CXX) $(CXXFLAGS) -c src/kernel/trap.cpp -o trap.o
 
-pmm.o: src/kernel/pmm.cpp include/kernel/pmm.h
+mem.o: src/kernel/mem.cpp include/kernel/mem.h
+	$(CXX) $(CXXFLAGS) -c src/kernel/mem.cpp -o mem.o
+
+pmm.o: src/kernel/pmm.cpp include/kernel/pmm.h include/kernel/mem.h
 	$(CXX) $(CXXFLAGS) -c src/kernel/pmm.cpp -o pmm.o
 
-kernel.o: src/kernel/kernel.cpp include/drivers/uart.h include/kernel/pmm.h
+vmm.o: src/kernel/vmm.cpp include/kernel/vmm.h include/kernel/pmm.h
+	$(CXX) $(CXXFLAGS) -c src/kernel/vmm.cpp -o vmm.o
+
+kernel.o: src/kernel/kernel.cpp include/drivers/uart.h include/kernel/pmm.h include/kernel/vmm.h
 	$(CXX) $(CXXFLAGS) -c src/kernel/kernel.cpp -o kernel.o
 
 run: $(TARGET)

@@ -10,6 +10,8 @@ namespace pmm {
 
     void* alloc_page(); // Allocate a single page of physical memory
 
+    void* alloc_zeroed_page(); // Allocate a page and clear it to zero
+
     void free_page(void* page); 
     // Free a previously allocated page of physical memory
 

@@ -1,5 +1,6 @@
 #include "drivers/uart.h"
 #include "kernel/pmm.h"
+#include "kernel/vmm.h"
 
 extern "C" char _end; // Symbol defined by the linker, marks the end of the kernel code and data 
 
@@ -74,6 +75,16 @@ extern "C" void kernel_main() {
     // 128 MB is default for QEMU virt
     uintptr_t ram_end = 0x80000000 + (128 * 1024 * 1024); // 128 MB
     pmm::init((uintptr_t)&_end, ram_end); // Initialize PMM with memory range after the kernel
+    print_pmm_stats(uart);
+
+    uart.print_str("\n--- Initializing Virtual Memory Scaffold ---\n");
+    if (vmm::init()) {
+        uart.print_str("Allocated Sv32 root page table at: ");
+        uart.print_hex(vmm::root_table_address());
+        uart.print_str("\n");
+    } else {
+        uart.print_str("Failed to allocate Sv32 root page table!\n");
+    }
     print_pmm_stats(uart);
 
     uart.print_str("\nAllocating singe page of memory...\n");
