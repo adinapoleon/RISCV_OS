@@ -2,7 +2,7 @@
 .globl _start           # entry point for linker (make _start global)
 
 _start:                     # entry point label
-    li sp, 0x84000000       # load immediate, stack pointer initialization  
+    la sp, _kernel_stack_top
 
     # Keep an M-mode trap vector for traps that are not delegated to S-mode.
     la t0, machine_trap_entry

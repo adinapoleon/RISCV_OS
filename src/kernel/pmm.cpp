@@ -9,11 +9,34 @@ namespace pmm {
     static uintptr_t memory_end;   // End of physical memory
     static size_t total_pages;     // Total number of pages
 
+    static bool is_page_allocated(size_t page_index) {
+        size_t byte_index = page_index / 8;
+        size_t bit_index = page_index % 8;
+        return (bitmap[byte_index] & (1 << bit_index)) != 0;
+    }
+
+    static void set_page_allocated(size_t page_index, bool allocated) {
+        size_t byte_index = page_index / 8;
+        size_t bit_index = page_index % 8;
+
+        if (allocated) {
+            bitmap[byte_index] |= (1 << bit_index);
+        } else {
+            bitmap[byte_index] &= ~(1 << bit_index);
+        }
+    }
+
     // Initialize the physical memory manager with the given memory range
     void init(uintptr_t start, uintptr_t end) {
         // Align start to 4KB boundary
         memory_start = (start + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-        memory_end = end;
+        memory_end = end & ~(PAGE_SIZE - 1);
+        if (memory_start >= memory_end) {
+            bitmap = nullptr;
+            total_pages = 0;
+            return;
+        }
+
         total_pages = (memory_end - memory_start) / PAGE_SIZE;
 
         // Allocate bitmap to track page usage
@@ -28,19 +51,14 @@ namespace pmm {
         // Mark the pages used by the bitmap itself as allocated
         size_t bitmap_pages = (bitmap_size + PAGE_SIZE - 1) / PAGE_SIZE;
         for (size_t i = 0; i < bitmap_pages; i++) {
-            size_t byte_index = i / 8;
-            size_t bit_index = i % 8;
-            bitmap[byte_index] |= (1 << bit_index);
+            set_page_allocated(i, true);
         }
     }
 
     void* alloc_page() {
         for (size_t i = 0; i < total_pages; i++) {
-            size_t byte_index = i / 8;
-            size_t bit_index = i % 8;
-
-            if ((bitmap[byte_index] & (1 << bit_index)) == 0) { // Page is free
-                bitmap[byte_index] |= (1 << bit_index); // Mark page as allocated
+            if (!is_page_allocated(i)) {
+                set_page_allocated(i, true);
                 return (void*)(memory_start + i * PAGE_SIZE);
             }
         }
@@ -49,14 +67,15 @@ namespace pmm {
 
     void free_page(void* page) {
         uintptr_t addr = (uintptr_t)page;
-        if (addr < memory_start || addr >= memory_end) {
+        if (addr < memory_start || addr >= memory_end || (addr % PAGE_SIZE) != 0) {
             return; // Invalid page address
         }
 
         size_t page_index = (addr - memory_start) / PAGE_SIZE;
-        size_t byte_index = page_index / 8;
-        size_t bit_index = page_index % 8;
+        if (!is_page_allocated(page_index)) {
+            return; // Double free
+        }
 
-        bitmap[byte_index] &= ~(1 << bit_index); // Mark page as free
+        set_page_allocated(page_index, false);
     }
 }
