@@ -4,37 +4,45 @@
 _start:                     # entry point label
     li sp, 0x84000000       # load immediate, stack pointer initialization  
 
-    # installing trap vector
-    la t0, trap_entry      # load address of trap vector into t0
-    csrw mtvec, t0          # write t0 to stvec register (set trap vector base address)
+    # Keep an M-mode trap vector for traps that are not delegated to S-mode.
+    la t0, machine_trap_entry
+    csrw mtvec, t0
 
-    # configure Physical Memory Protection
-    li t0, 0xFFFFFFFF     # load immediate, set t0 to 0xFFFFF000 (base address for PMP region)
-    srli t0, t0, 2       # shift right logical by 2 to get the PMP address encoding 
-    csrw pmpaddr0, t0        # write t0 to pmpaddr0 register
+    # Allow S-mode to access the whole 32-bit physical address space.
+    li t0, 0xFFFFFFFF
+    srli t0, t0, 2
+    csrw pmpaddr0, t0
 
-    li t0, 0x1F            # load immediate, set t0 to 0x1F (PMP entry 0: RWX permissions)
-    csrw pmpcfg0, t0         # write t0 to pmpcfg0 register 
+    # PMP entry 0: TOR region, RWX permissions.
+    li t0, 0x0F
+    csrw pmpcfg0, t0
 
-    # set stvec
-    la t0, supervisor_trap_entry      # load address of trap vector into t0
-    csrw stvec, t0          # write t0 to stvec register (set trap vector base address)
+    # Delegate common synchronous exceptions to S-mode.
+    li t0, 0xB1FF
+    csrw medeleg, t0
+
+    # Delegate supervisor software/timer/external interrupt causes.
+    li t0, 0x222
+    csrw mideleg, t0
+
+    # Install the S-mode trap vector.
+    la t0, supervisor_trap_entry
+    csrw stvec, t0
 
     # set mepc to main function
-    la t0, supervisor_main             # load address of main function into t0
-    csrw mepc, t0                      # write t0 to mepc register (set program counter to main function)
+    la t0, supervisor_main
+    csrw mepc, t0
 
     #update mstatus to set MPP
-    csrr t0, mstatus        # read mstatus register into t0
-    # clear MPP bits (bits 11 and 12) in t0
-    li t1, 0x1800          # load immediate, set t1 to 0x1800 (mask for MPP bits)
-    not t1, t1             # bitwise NOT to get mask for clearing MPP bits
-    and t0, t0, t1          # clear MPP bits in t0
+    csrr t0, mstatus
+    li t1, 0x1800
+    not t1, t1
+    and t0, t0, t1
 
-    li t1, 0x0800          # load immediate, set t1 to 0x0800 (value for MPP=01, supervisor mode)
-    or t0, t0, t1           # set MPP bits to 01 (supervisor mode) in t0
+    li t1, 0x0800
+    or t0, t0, t1
 
-    csrw mstatus, t0         # write t0 back to mstatus register (update mstatus with new MPP)
+    csrw mstatus, t0
 
     # mret
     mret                    # return from machine mode to supervisor mode (jump to main function)
@@ -46,19 +54,40 @@ _start:                     # entry point label
 1:
     j 1b                  # jump back to label 1 (infinite loop to prevent exit)
 
-# trap entry point
-.global trap_entry
-.balign 4               #align to 4 bytes
-trap_entry:
-    # Allocate space for trap frame on stack (31 registers * 4 bytes each)
-    addi sp, sp, -124     # adjust stack pointer to allocate space for trap frame
+# S-mode C++ entry point.
+.global supervisor_main
+.balign 4
+supervisor_main:
+    call kernel_main
+1:
+    j 1b
 
-    # save x1 to x31 registers onto the stack
+# Unexpected M-mode trap entry point.
+.global machine_trap_entry
+.balign 4
+machine_trap_entry:
+    csrr a0, mcause
+    csrr a1, mepc
+    csrr a2, mtval
+    li a3, 0
+    call machine_trap_handler
+1:
+    j 1b
+
+# S-mode trap entry point.
+.global supervisor_trap_entry
+.balign 4               #align to 4 bytes
+supervisor_trap_entry:
+    # Allocate a 16-byte-aligned trap frame for x1-x31.
+    addi sp, sp, -128
+
+    # Save x1-x31 registers onto the stack. Save original sp separately.
     sw x1, 0(sp)          # save x1 at offset 0
-    sw x2, 4(sp)          # save x2 at offset 4
+    sw x5, 16(sp)         # save x5 before using it as a temporary
+    addi t0, sp, 128
+    sw t0, 4(sp)          # save interrupted x2 at offset 4
     sw x3, 8(sp)          # save x3 at offset 8
     sw x4, 12(sp)         # save x4 at offset 12
-    sw x5, 16(sp)         # save x5 at offset 16
     sw x6, 20(sp)         # save x6 at offset 20
     sw x7, 24(sp)         # save x7 at offset 24
     sw x8, 28(sp)         # save x8 at offset 28
@@ -87,16 +116,15 @@ trap_entry:
     sw x31, 120(sp)       # save x31 at offset 120
 
     # pass arguments to trap handler 
-    csrr a0, mcause        # read mcause register into a0 (trap cause)
-    csrr a1, mepc          # read mepc register into a1 (program counter at time of trap)
-    csrr a2, mtval         # read mtval register into a2 (trap value)
+    csrr a0, scause        # read scause register into a0 (trap cause)
+    csrr a1, sepc          # read sepc register into a1 (program counter at time of trap)
+    csrr a2, stval         # read stval register into a2 (trap value)
     mv a3, sp              # move current stack pointer (trap frame) into a3
 
-    call trap_handler         # call the trap handler function
+    call supervisor_trap_handler
 
-    # restore x1 to x31 registers from the stack
+    # Restore x1-x31 registers from the stack. Restore sp last.
     lw x1, 0(sp)          # restore x1 from offset 0
-    lw x2, 4(sp)          # restore x2 from offset 4
     lw x3, 8(sp)          # restore x3 from offset 8
     lw x4, 12(sp)         # restore x4 from offset 12
     lw x5, 16(sp)         # restore x5 from offset 16
@@ -127,6 +155,5 @@ trap_entry:
     lw x30, 116(sp)       # restore x30 from offset 116
     lw x31, 120(sp)       # restore x31 from offset 120
 
-    addi sp, sp, 124      # adjust stack pointer back to original position
-    mret                    # return from trap (restore program counter and status) 
-
+    lw x2, 4(sp)          # restore original stack pointer
+    sret                  # return from S-mode trap
