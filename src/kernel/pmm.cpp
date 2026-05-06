@@ -7,7 +7,7 @@ namespace pmm {
     static uint8_t* bitmap; // Bitmap to track allocated/free pages
     static uintptr_t memory_start; // Start of physical memory
     static uintptr_t memory_end;   // End of physical memory
-    static size_t total_pages;     // Total number of pages
+    static size_t total_page_count; // Total number of pages
 
     static bool is_page_allocated(size_t page_index) {
         size_t byte_index = page_index / 8;
@@ -33,14 +33,14 @@ namespace pmm {
         memory_end = end & ~(PAGE_SIZE - 1);
         if (memory_start >= memory_end) {
             bitmap = nullptr;
-            total_pages = 0;
+            total_page_count = 0;
             return;
         }
 
-        total_pages = (memory_end - memory_start) / PAGE_SIZE;
+        total_page_count = (memory_end - memory_start) / PAGE_SIZE;
 
         // Allocate bitmap to track page usage
-        size_t bitmap_size = (total_pages + 7) / 8; // 1 bit per page
+        size_t bitmap_size = (total_page_count + 7) / 8; // 1 bit per page
         bitmap = (uint8_t*)memory_start; // Use the beginning of memory for bitmap
         
         // Mark all pages as free initially
@@ -56,7 +56,7 @@ namespace pmm {
     }
 
     void* alloc_page() {
-        for (size_t i = 0; i < total_pages; i++) {
+        for (size_t i = 0; i < total_page_count; i++) {
             if (!is_page_allocated(i)) {
                 set_page_allocated(i, true);
                 return (void*)(memory_start + i * PAGE_SIZE);
@@ -77,5 +77,24 @@ namespace pmm {
         }
 
         set_page_allocated(page_index, false);
+    }
+
+    size_t total_pages() {
+        return total_page_count;
+    }
+
+    size_t free_pages() {
+        size_t count = 0;
+        for (size_t i = 0; i < total_page_count; i++) {
+            if (!is_page_allocated(i)) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    size_t used_pages() {
+        return total_page_count - free_pages();
     }
 }

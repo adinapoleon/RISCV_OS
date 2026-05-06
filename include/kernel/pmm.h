@@ -12,4 +12,10 @@ namespace pmm {
 
     void free_page(void* page); 
     // Free a previously allocated page of physical memory
+
+    size_t total_pages(); // Total pages managed by the PMM
+
+    size_t free_pages(); // Pages currently available for allocation
+
+    size_t used_pages(); // Pages currently reserved or allocated
 }

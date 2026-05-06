@@ -3,6 +3,16 @@
 
 extern "C" char _end; // Symbol defined by the linker, marks the end of the kernel code and data 
 
+static void print_pmm_stats(Uart& uart) {
+    uart.print_str("PMM total pages: ");
+    uart.print_int((int32_t)pmm::total_pages());
+    uart.print_str(", used pages: ");
+    uart.print_int((int32_t)pmm::used_pages());
+    uart.print_str(", free pages: ");
+    uart.print_int((int32_t)pmm::free_pages());
+    uart.print_str("\n");
+}
+
 // to avoid name mangling
 extern "C" void kernel_main() {
 
@@ -64,6 +74,7 @@ extern "C" void kernel_main() {
     // 128 MB is default for QEMU virt
     uintptr_t ram_end = 0x80000000 + (128 * 1024 * 1024); // 128 MB
     pmm::init((uintptr_t)&_end, ram_end); // Initialize PMM with memory range after the kernel
+    print_pmm_stats(uart);
 
     uart.print_str("\nAllocating singe page of memory...\n");
     void* page1 = pmm::alloc_page();
@@ -74,9 +85,11 @@ extern "C" void kernel_main() {
     } else {
         uart.print_str("Failed to allocate page!\n");
     }
+    print_pmm_stats(uart);
 
     uart.print_str("\nFreeing the allocated page...\n");
     pmm::free_page(page1);
+    print_pmm_stats(uart);
 
     uart.print_str("\nTrying to allocate another page after freeing...\n");
     void* page2 = pmm::alloc_page();
@@ -87,6 +100,7 @@ extern "C" void kernel_main() {
     } else {
         uart.print_str("Failed to allocate page!\n");
     }
+    print_pmm_stats(uart);
 
     uart.print_str("\nDone!\n");
 
