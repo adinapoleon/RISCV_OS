@@ -1,8 +1,6 @@
 #include "drivers/uart.h"
-#include "kernel/pmm.h"
-#include "kernel/vmm.h"
-
-extern "C" char _end; // Symbol defined by the linker, marks the end of the kernel code and data 
+#include "memory/pmm.h"
+#include "memory/vmm.h"
 
 static void print_pmm_stats(Uart& uart) {
     uart.print_str("PMM total pages: ");
@@ -74,7 +72,7 @@ extern "C" void kernel_main() {
 
     // 128 MB is default for QEMU virt
     uintptr_t ram_end = 0x80000000 + (128 * 1024 * 1024); // 128 MB
-    pmm::init((uintptr_t)&_end, ram_end); // Initialize PMM with memory range after the kernel
+    pmm::init_after_kernel(ram_end);
     print_pmm_stats(uart);
 
     uart.print_str("\n--- Initializing Virtual Memory Scaffold ---\n");

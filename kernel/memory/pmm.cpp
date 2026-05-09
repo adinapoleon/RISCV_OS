@@ -1,6 +1,8 @@
-#include "kernel/pmm.h"
-#include "kernel/mem.h"
+#include "memory/pmm.h"
+#include "memory/mem.h"
 #include <stddef.h>
+
+extern "C" char _end;
 
 // Simple bitmap-based physical memory manager implementation
 namespace pmm {
@@ -9,6 +11,14 @@ namespace pmm {
     static uintptr_t memory_start; // Start of physical memory
     static uintptr_t memory_end;   // End of physical memory
     static size_t total_page_count; // Total number of pages
+
+    static uintptr_t align_up(uintptr_t value, uintptr_t alignment) {
+        return (value + alignment - 1) & ~(alignment - 1);
+    }
+
+    static uintptr_t align_down(uintptr_t value, uintptr_t alignment) {
+        return value & ~(alignment - 1);
+    }
 
     static bool is_page_allocated(size_t page_index) {
         size_t byte_index = page_index / 8;
@@ -27,11 +37,17 @@ namespace pmm {
         }
     }
 
+    static void reserve_pages(size_t first_page, size_t page_count) {
+        for (size_t i = 0; i < page_count && first_page + i < total_page_count; i++) {
+            set_page_allocated(first_page + i, true);
+        }
+    }
+
     // Initialize the physical memory manager with the given memory range
     void init(uintptr_t start, uintptr_t end) {
         // Align start to 4KB boundary
-        memory_start = (start + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-        memory_end = end & ~(PAGE_SIZE - 1);
+        memory_start = align_up(start, PAGE_SIZE);
+        memory_end = align_down(end, PAGE_SIZE);
         if (memory_start >= memory_end) {
             bitmap = nullptr;
             total_page_count = 0;
@@ -51,9 +67,11 @@ namespace pmm {
 
         // Mark the pages used by the bitmap itself as allocated
         size_t bitmap_pages = (bitmap_size + PAGE_SIZE - 1) / PAGE_SIZE;
-        for (size_t i = 0; i < bitmap_pages; i++) {
-            set_page_allocated(i, true);
-        }
+        reserve_pages(0, bitmap_pages);
+    }
+
+    void init_after_kernel(uintptr_t ram_end) {
+        init((uintptr_t)&_end, ram_end);
     }
 
     void* alloc_page() {

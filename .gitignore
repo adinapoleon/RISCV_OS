@@ -1,0 +1,22 @@
+# Build artifacts
+*.o
+*.elf
+*.bin
+*.img
+*.map
+*.lst
+*.dis
+
+# Generated dependency files
+*.d
+
+# Local editor and OS files
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Local Codex/agent app metadata
+.agents/
+.codex/

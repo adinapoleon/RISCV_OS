@@ -1,5 +1,5 @@
-#include "kernel/vmm.h"
-#include "kernel/pmm.h"
+#include "memory/vmm.h"
+#include "memory/pmm.h"
 #include <stddef.h>
 
 namespace vmm {

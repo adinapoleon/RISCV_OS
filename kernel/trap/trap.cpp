@@ -1,4 +1,4 @@
-#include "kernel/trap.h"
+#include "trap/trap.h"
 #include "drivers/uart.h"
 
 static void advance_sepc() {

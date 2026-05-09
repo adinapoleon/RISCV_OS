@@ -1,4 +1,4 @@
-#include "kernel/mem.h"
+#include "memory/mem.h"
 #include <stdint.h>
 
 namespace mem {

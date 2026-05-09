@@ -23,7 +23,11 @@ SECTIONS
     /* bss section - Block Started by Symbol,
      * used for uninitialized global variables
      */
-    .bss : { *(.bss*) *(COMMON) }
+    .bss : {
+        PROVIDE(__bss_start = .);
+        *(.bss*) *(COMMON)
+        PROVIDE(__bss_end = .);
+    }
 
     . = ALIGN(16);
     PROVIDE(_kernel_stack_bottom = .);
