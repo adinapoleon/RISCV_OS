@@ -91,6 +91,31 @@ static bool run_pmm_smoke_test(Uart& uart) {
     passed = print_check(uart, "free_page reports a valid reused-page free", freed_page2) && passed;
     passed = print_check(uart, "PMM smoke test leaves no leaked pages", pmm::free_pages() == initial_free_pages) && passed;
 
+    uart.print_str("\nTesting zeroed page allocation...\n");
+    void* dirty_page = pmm::alloc_page();
+    if (dirty_page) {
+        uint32_t* words = static_cast<uint32_t*>(dirty_page);
+        words[0] = 0xA5A5A5A5;
+        words[(pmm::PAGE_SIZE / sizeof(uint32_t)) - 1] = 0x5A5A5A5A;
+        pmm::free_page(dirty_page);
+    }
+
+    void* zeroed_page = pmm::alloc_zeroed_page();
+    print_pmm_stats(uart);
+    passed = print_check(uart, "alloc_zeroed_page returns a page", zeroed_page != nullptr) && passed;
+    if (zeroed_page) {
+        uint32_t* words = static_cast<uint32_t*>(zeroed_page);
+        passed = print_check(uart, "alloc_zeroed_page clears first word", words[0] == 0) && passed;
+        passed = print_check(uart, "alloc_zeroed_page clears last word", words[(pmm::PAGE_SIZE / sizeof(uint32_t)) - 1] == 0) && passed;
+    }
+    passed = print_check(uart, "alloc_zeroed_page consumes one free page", pmm::free_pages() == initial_free_pages - 1) && passed;
+
+    uart.print_str("\nFreeing the zeroed page...\n");
+    bool freed_zeroed_page = pmm::free_page(zeroed_page);
+    print_pmm_stats(uart);
+    passed = print_check(uart, "free_page reports a valid zeroed-page free", freed_zeroed_page) && passed;
+    passed = print_check(uart, "zeroed-page test leaves no leaked pages", pmm::free_pages() == initial_free_pages) && passed;
+
     uart.print_str(passed ? "\nPMM smoke test passed.\n" : "\nPMM smoke test failed.\n");
     return passed;
 }
