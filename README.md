@@ -1,93 +1,113 @@
 # RISC-V Simple OS
 
-A bare-metal operating system for the RISC-V architecture, targeting the QEMU `virt` machine.
+A small bare-metal RISC-V OS written in freestanding C++ for the QEMU `virt`
+machine. The kernel currently targets RV32IM with CSR support, boots from
+Machine mode, drops into Supervisor mode, and uses the 16550A UART for console
+output.
 
----
+## Current Status
 
-## Current Progress: S-Mode Kernel Bring-Up
+The kernel can boot under `qemu-system-riscv32`, initialize basic machine and
+supervisor trap state, run PMM smoke checks, allocate a zeroed Sv32 root page
+table, and idle cleanly.
 
-We have evolved the kernel from basic hardware interaction to a system capable of entering Supervisor mode, handling delegated traps, and managing physical pages.
+Completed so far:
 
-### Project Layout
+- Reset entry, stack setup, `.bss` zeroing, and linker-defined RAM/kernel
+  symbols.
+- M-mode setup for `mtvec`, PMP, trap delegation, `stvec`, and `mret` into
+  S-mode.
+- Supervisor trap entry that saves general-purpose registers and dispatches to
+  C++ trap handling.
+- Polled QEMU `virt` UART driver for strings, signed integers, and hex output.
+- Bitmap-based physical page allocator over linker-defined RAM bounds.
+- PMM protection for allocator metadata pages, invalid frees, and double frees.
+- PMM accounting for total, used, and free pages.
+- Zeroed page allocation for page-table construction.
+- Sv32 VMM scaffold that allocates the root page table.
+- Local and GitHub Actions smoke-test path that boots the kernel in QEMU and
+  checks PMM/VMM bring-up output.
+
+## Project Layout
 
 ```text
 kernel/
   arch/riscv/   # reset entry, M-mode setup, S-mode entry, trap stubs
-  core/         # kernel_main and top-level boot tests
-  drivers/      # hardware drivers such as UART
+  core/         # kernel_main and boot smoke checks
+  drivers/      # UART driver
   memory/       # mem helpers, PMM, VMM/Sv32 scaffold
   trap/         # C++ trap dispatch and trap-frame definitions
+notes/          # hardware and subsystem notes
 scripts/
-  linker.ld
+  linker.ld     # QEMU virt memory layout and kernel symbols
+  smoke.sh      # QEMU smoke-test runner
+.github/
+  workflows/    # CI build and smoke test
 ```
 
-### Key Features of the Physical Memory Manager (PMM):
+## Build And Run
 
-*   **Bitmap-Based Allocation:** Uses a bitmap to track the status of every 4KB page in the 128MB RAM provided by QEMU.
-*   **Linker Integration:** Automatically detects the start of available memory using the `_end` symbol inside the PMM, ensuring the kernel never overwrites its own code or static data.
-*   **Page Alignment:** Enforces strict 4KB alignment for all allocated pages, a prerequisite for RISC-V hardware paging (Sv32).
-*   **Self-Protection:** The allocator is "aware" of the memory it uses for its own bitmap and marks those pages as reserved to prevent self-corruption.
-*   **Standard Interface:** Provides a clean `alloc_page()` and `free_page()` API, abstracting the complexity of bit-manipulation from the rest of the kernel.
+Dependencies:
 
----
+- `riscv64-unknown-elf-g++`
+- `qemu-system-riscv32`
+- `make`
 
-## Step 2: Machine/Supervisor Trap Handling
+Build:
 
-Working trap stubs and C++ dispatch for machine-mode fallback traps and delegated supervisor-mode traps.
+```bash
+make
+```
 
-*   **`mtvec`/`stvec` Installation:** M-mode and S-mode trap vectors are installed during early boot.
-*   **Full Context Save:** Saves all 31 general-purpose registers (x1–x31) as a `TrapFrame`.
-*   **C Dispatcher:** Decodes `scause`/`mcause` to distinguish interrupts from exceptions and prints diagnostics.
-*   **Verified Exceptions:** Tested with Illegal Instruction, Load/Store faults, and Breakpoints.
-
----
-
-## Step 1: Robust UART Driver
-
-The foundation of all kernel output, providing 16550A-compliant serial communication.
-
-*   **Polled I/O:** Uses the Line Status Register (LSR) to ensure hardware readiness.
-*   **Object-Oriented:** Encapsulated in a `Uart` class with support for strings, integers, and hexadecimal output.
-
----
-
-## Project Roadmap
-
-1.  **Phase 1: Stabilization & S-Mode** (In Progress)
-    - [x] Physical Memory Manager
-    - [x] Transition from Machine Mode (M) to Supervisor Mode (S)
-    - [x] Split early assembly by responsibility
-    - [x] Zero `.bss` during boot
-    - [ ] Interrupt-driven UART (moving away from polling)
-2.  **Phase 2: Virtual Memory**
-    - [ ] Sv32 Page Table implementation
-    - [ ] Identity mapping for Kernel
-    - [ ] Kernel Heap (kmalloc)
-3.  **Phase 3: Processes & Scheduling**
-    - [ ] Context switching assembly logic
-    - [ ] Timer-based preemption (CLINT)
-    - [ ] Round-robin scheduler
-4.  **Phase 4: User Space**
-    - [ ] `ecall` based System Call interface
-    - [ ] Privilege separation (U-mode)
-    - [ ] Basic `write` and `exit` syscalls
-
----
-
-## Documentation
-
-Detailed specifications for the hardware components and software abstractions can be found in the `notes/` directory:
-*   `notes/TRAP.md`: Machine-mode trap handling and CSRs.
-*   `notes/UART.md`: 16550A UART register map and initialization.
-*   `notes/MEMORY.md`: Physical and Virtual memory management (Sv32).
-
----
-
-## How to Run
-
-Ensure you have the RISC-V GCC toolchain (`riscv64-unknown-elf-g++`) and QEMU (`qemu-system-riscv32`) installed.
+Run interactively:
 
 ```bash
 make run
 ```
----
+
+Run the smoke test used by CI:
+
+```bash
+make smoke
+```
+
+The smoke test expects QEMU to time out because the kernel reaches its idle
+loop. It fails if any boot check prints `[FAIL]` or if the expected PMM/VMM
+bring-up markers are missing.
+
+## Continuous Integration
+
+GitHub Actions runs on every push and pull request. The workflow installs the
+RISC-V bare-metal toolchain and QEMU, builds the kernel, then runs:
+
+```bash
+make smoke
+```
+
+## Roadmap
+
+Immediate next steps:
+
+- Finish Sv32 VMM mapping helpers.
+- Identity-map the kernel image and required MMIO regions.
+- Enable paging with `satp` mode `Sv32` and `sfence.vma`.
+- Add cleaner linker sections/permissions so the ELF no longer emits the RWX
+  LOAD segment warning.
+- Add CLINT timer setup and supervisor timer interrupt handling.
+- Add an `ecall`/syscall path.
+
+Later:
+
+- Kernel heap allocation.
+- Scheduler groundwork and context switching.
+- User-mode entry and basic `write`/`exit` syscalls.
+- Interrupt-driven UART and PLIC support.
+
+## Notes
+
+Detailed hardware and subsystem notes live in `notes/`:
+
+- `notes/TRAP.md`
+- `notes/UART.md`
+- `notes/MEMORY.md`
+- `notes/RISCV_ISA.md`
