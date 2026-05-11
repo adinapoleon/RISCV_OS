@@ -53,5 +53,8 @@ kernel.o: kernel/core/kernel.cpp kernel/drivers/uart.h kernel/memory/pmm.h kerne
 run: $(TARGET)
 	qemu-system-riscv32 -machine virt -nographic -bios none -kernel $(TARGET)
 
+smoke: $(TARGET)
+	./scripts/smoke.sh $(TARGET)
+
 clean:
 	rm -f *.o $(TARGET)
