@@ -4,9 +4,7 @@
 
 namespace {
 
-constexpr uintptr_t QEMU_VIRT_DRAM_BASE = 0x80000000;
-constexpr uintptr_t QEMU_VIRT_DRAM_SIZE = 128 * 1024 * 1024;
-constexpr uintptr_t QEMU_VIRT_DRAM_END = QEMU_VIRT_DRAM_BASE + QEMU_VIRT_DRAM_SIZE;
+extern "C" char _ram_end;
 
 #ifndef KERNEL_RUN_TRAP_TESTS
 #define KERNEL_RUN_TRAP_TESTS 0
@@ -32,7 +30,7 @@ static bool print_check(Uart& uart, const char* name, bool passed) {
 static bool init_memory(Uart& uart) {
     uart.print_str("\n\n--- Testing Physical Memory Manager ---\n");
 
-    pmm::init_after_kernel(QEMU_VIRT_DRAM_END);
+    pmm::init_after_kernel(reinterpret_cast<uintptr_t>(&_ram_end));
     print_pmm_stats(uart);
 
     uart.print_str("\n--- Initializing Virtual Memory Scaffold ---\n");

@@ -3,11 +3,14 @@
 ENTRY(_start) 
 /* Entry point for the linker */
 
+PROVIDE(_ram_start = 0x80000000);
+PROVIDE(_ram_end = 0x88000000);
+
 /* Section definitions */
 SECTIONS
 {
     /* Set the entry point for the linker */
-    . = 0x80000000;
+    . = _ram_start;
 
     PROVIDE(_kernel_start = .);
 
