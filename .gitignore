@@ -6,6 +6,11 @@
 *.map
 *.lst
 *.dis
+*.log
+
+# QEMU/CI smoke-test scratch output
+smoke-output.txt
+qemu-output.txt
 
 # Generated dependency files
 *.d
