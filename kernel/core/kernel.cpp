@@ -2,6 +2,16 @@
 #include "memory/pmm.h"
 #include "memory/vmm.h"
 
+namespace {
+
+constexpr uintptr_t QEMU_VIRT_DRAM_BASE = 0x80000000;
+constexpr uintptr_t QEMU_VIRT_DRAM_SIZE = 128 * 1024 * 1024;
+constexpr uintptr_t QEMU_VIRT_DRAM_END = QEMU_VIRT_DRAM_BASE + QEMU_VIRT_DRAM_SIZE;
+
+#ifndef KERNEL_RUN_TRAP_TESTS
+#define KERNEL_RUN_TRAP_TESTS 0
+#endif
+
 static void print_pmm_stats(Uart& uart) {
     uart.print_str("PMM total pages: ");
     uart.print_int((int32_t)pmm::total_pages());
@@ -12,67 +22,10 @@ static void print_pmm_stats(Uart& uart) {
     uart.print_str("\n");
 }
 
-// to avoid name mangling
-extern "C" void kernel_main() {
-
-    // Initialize the UART
-    Uart uart;
-
-    //add some buffer to differentiate the output
-    uart.print_str("\n\n--- Kernel Initialized ---\n");
-
-    // string that will be printed to the UART
-    uart.print_str("\nHello world from RISC-V OS with a robust UART driver!\n");
-
-    // demonstrating integer printing
-    uart.print_str("\nLet's count: ");
-    for (int i = 1; i <= 5; i++) {
-        uart.print_int(i);
-        if (i < 5) {
-            uart.print_str(", ");
-        }
-    }
-
-    uart.print_str("\n\nAll hex numbers from 0 to F: ");
-    for (uint32_t n = 0x0; n <= 0xF; n++) {
-        uart.print_hex(n);
-        if (n < 0xF) {
-            uart.print_str(", ");
-        }
-    }
-
-    // Test 1: exception — illegal instruction
-    uart.print_str("\n\n--- Testing illegal instruction exception ---\n");
-    asm volatile(".word 0x00000000");
-    
-    // Load access fault (cause=0x5)
-    uart.print_str("\n\n--- Testing load access fault ---\n");
-    {
-        volatile uint32_t* bad_ptr = (volatile uint32_t*)0xDEADBEEF;
-        volatile uint32_t val = *bad_ptr;
-        (void)val;
-    }
-
-    // Store access fault (cause=0x7)
-    uart.print_str("\n\n--- Testing store access fault ---\n");
-    {
-        volatile uint32_t* bad_ptr = (volatile uint32_t*)0xDEADBEEF;
-        *bad_ptr = 0x42;
-    }
-
-    // Breakpoint (cause=0x3) — ebreak instruction
-    uart.print_str("\n\n--- Testing breakpoint ---\n");
-    asm volatile("ebreak");
-
-    //test if it returns to the main function after handling the interrupt
-    uart.print_str("\n\nIf you see this message after the interrupt, it means the kernel successfully handled the interrupt and returned to main.\n");
-
-    // testing memory management by allocating and freeing pages
+static bool init_memory(Uart& uart) {
     uart.print_str("\n\n--- Testing Physical Memory Manager ---\n");
 
-    // 128 MB is default for QEMU virt
-    uintptr_t ram_end = 0x80000000 + (128 * 1024 * 1024); // 128 MB
-    pmm::init_after_kernel(ram_end);
+    pmm::init_after_kernel(QEMU_VIRT_DRAM_END);
     print_pmm_stats(uart);
 
     uart.print_str("\n--- Initializing Virtual Memory Scaffold ---\n");
@@ -82,10 +35,15 @@ extern "C" void kernel_main() {
         uart.print_str("\n");
     } else {
         uart.print_str("Failed to allocate Sv32 root page table!\n");
+        return false;
     }
     print_pmm_stats(uart);
 
-    uart.print_str("\nAllocating singe page of memory...\n");
+    return true;
+}
+
+static void run_pmm_smoke_test(Uart& uart) {
+    uart.print_str("\nAllocating single page of memory...\n");
     void* page1 = pmm::alloc_page();
     if (page1) {
         uart.print_str("Allocated page at address: ");
@@ -111,7 +69,52 @@ extern "C" void kernel_main() {
     }
     print_pmm_stats(uart);
 
-    uart.print_str("\nDone!\n");
+    uart.print_str("\nMemory bring-up complete.\n");
+}
 
-    while (1) {} // infinite loop to prevent the kernel from exiting
+#if KERNEL_RUN_TRAP_TESTS
+static void run_trap_smoke_tests(Uart& uart) {
+    uart.print_str("\n\n--- Testing illegal instruction exception ---\n");
+    asm volatile(".word 0x00000000");
+
+    uart.print_str("\n\n--- Testing load access fault ---\n");
+    {
+        volatile uint32_t* bad_ptr = (volatile uint32_t*)0xDEADBEEF;
+        volatile uint32_t val = *bad_ptr;
+        (void)val;
+    }
+
+    uart.print_str("\n\n--- Testing store access fault ---\n");
+    {
+        volatile uint32_t* bad_ptr = (volatile uint32_t*)0xDEADBEEF;
+        *bad_ptr = 0x42;
+    }
+
+    uart.print_str("\n\n--- Testing breakpoint ---\n");
+    asm volatile("ebreak");
+
+    uart.print_str("\n\nTrap smoke tests returned to kernel_main.\n");
+}
+#endif
+
+}
+
+// to avoid name mangling
+extern "C" void kernel_main() {
+    Uart uart;
+
+    uart.print_str("\n\n--- RISC-V OS Kernel ---\n");
+    uart.print_str("Booting supervisor kernel...\n");
+
+    if (init_memory(uart)) {
+        run_pmm_smoke_test(uart);
+    }
+
+#if KERNEL_RUN_TRAP_TESTS
+    run_trap_smoke_tests(uart);
+#endif
+
+    uart.print_str("\nKernel idle.\n");
+
+    while (1) {}
 }
