@@ -68,9 +68,12 @@ static bool run_pmm_smoke_test(Uart& uart) {
     passed = print_check(uart, "alloc_page consumes one free page", pmm::free_pages() == initial_free_pages - 1) && passed;
 
     uart.print_str("\nFreeing the allocated page...\n");
-    pmm::free_page(page1);
+    bool freed_page1 = pmm::free_page(page1);
     print_pmm_stats(uart);
+    passed = print_check(uart, "free_page reports a valid free", freed_page1) && passed;
     passed = print_check(uart, "free_page restores the free count", pmm::free_pages() == initial_free_pages) && passed;
+    passed = print_check(uart, "free_page rejects double frees", !pmm::free_page(page1)) && passed;
+    passed = print_check(uart, "free_page rejects invalid pages", !pmm::free_page(reinterpret_cast<void*>(0xDEADBEEF))) && passed;
 
     uart.print_str("\nTrying to allocate another page after freeing...\n");
     void* page2 = pmm::alloc_page();
@@ -85,8 +88,9 @@ static bool run_pmm_smoke_test(Uart& uart) {
     passed = print_check(uart, "allocator reuses the freed page", page2 == page1) && passed;
 
     uart.print_str("\nFreeing the reused page...\n");
-    pmm::free_page(page2);
+    bool freed_page2 = pmm::free_page(page2);
     print_pmm_stats(uart);
+    passed = print_check(uart, "free_page reports a valid reused-page free", freed_page2) && passed;
     passed = print_check(uart, "PMM smoke test leaves no leaked pages", pmm::free_pages() == initial_free_pages) && passed;
 
     uart.print_str(passed ? "\nPMM smoke test passed.\n" : "\nPMM smoke test failed.\n");

@@ -11,6 +11,9 @@ namespace pmm {
     static uintptr_t memory_start; // Start of physical memory
     static uintptr_t memory_end;   // End of physical memory
     static size_t total_page_count; // Total number of pages
+    static size_t allocated_page_count; // Pages reserved or allocated
+    static size_t first_allocatable_page; // Pages before this are reserved for PMM metadata
+    static size_t next_free_hint; // First page index to try on the next allocation
 
     static uintptr_t align_up(uintptr_t value, uintptr_t alignment) {
         return (value + alignment - 1) & ~(alignment - 1);
@@ -18,6 +21,10 @@ namespace pmm {
 
     static uintptr_t align_down(uintptr_t value, uintptr_t alignment) {
         return value & ~(alignment - 1);
+    }
+
+    static bool page_index_valid(size_t page_index) {
+        return page_index < total_page_count;
     }
 
     static bool is_page_allocated(size_t page_index) {
@@ -37,9 +44,29 @@ namespace pmm {
         }
     }
 
+    static bool mark_page_allocated(size_t page_index) {
+        if (!page_index_valid(page_index) || is_page_allocated(page_index)) {
+            return false;
+        }
+
+        set_page_allocated(page_index, true);
+        allocated_page_count++;
+        return true;
+    }
+
+    static bool mark_page_free(size_t page_index) {
+        if (!page_index_valid(page_index) || !is_page_allocated(page_index)) {
+            return false;
+        }
+
+        set_page_allocated(page_index, false);
+        allocated_page_count--;
+        return true;
+    }
+
     static void reserve_pages(size_t first_page, size_t page_count) {
         for (size_t i = 0; i < page_count && first_page + i < total_page_count; i++) {
-            set_page_allocated(first_page + i, true);
+            mark_page_allocated(first_page + i);
         }
     }
 
@@ -51,10 +78,16 @@ namespace pmm {
         if (memory_start >= memory_end) {
             bitmap = nullptr;
             total_page_count = 0;
+            allocated_page_count = 0;
+            first_allocatable_page = 0;
+            next_free_hint = 0;
             return;
         }
 
         total_page_count = (memory_end - memory_start) / PAGE_SIZE;
+        allocated_page_count = 0;
+        first_allocatable_page = 0;
+        next_free_hint = 0;
 
         // Allocate bitmap to track page usage
         size_t bitmap_size = (total_page_count + 7) / 8; // 1 bit per page
@@ -67,6 +100,8 @@ namespace pmm {
 
         // Mark the pages used by the bitmap itself as allocated
         size_t bitmap_pages = (bitmap_size + PAGE_SIZE - 1) / PAGE_SIZE;
+        first_allocatable_page = bitmap_pages;
+        next_free_hint = first_allocatable_page;
         reserve_pages(0, bitmap_pages);
     }
 
@@ -75,12 +110,23 @@ namespace pmm {
     }
 
     void* alloc_page() {
-        for (size_t i = 0; i < total_page_count; i++) {
-            if (!is_page_allocated(i)) {
-                set_page_allocated(i, true);
-                return (void*)(memory_start + i * PAGE_SIZE);
+        if (bitmap == nullptr || first_allocatable_page >= total_page_count) {
+            return nullptr;
+        }
+
+        for (size_t scanned = 0; scanned < total_page_count - first_allocatable_page; scanned++) {
+            size_t page_index = first_allocatable_page
+                + ((next_free_hint - first_allocatable_page + scanned) % (total_page_count - first_allocatable_page));
+
+            if (mark_page_allocated(page_index)) {
+                next_free_hint = page_index + 1;
+                if (next_free_hint >= total_page_count) {
+                    next_free_hint = first_allocatable_page;
+                }
+                return (void*)(memory_start + page_index * PAGE_SIZE);
             }
         }
+
         return nullptr; // No free pages available
     }
 
@@ -93,18 +139,22 @@ namespace pmm {
         return page;
     }
 
-    void free_page(void* page) {
+    bool free_page(void* page) {
         uintptr_t addr = (uintptr_t)page;
         if (addr < memory_start || addr >= memory_end || (addr % PAGE_SIZE) != 0) {
-            return; // Invalid page address
+            return false; // Invalid page address
         }
 
         size_t page_index = (addr - memory_start) / PAGE_SIZE;
-        if (!is_page_allocated(page_index)) {
-            return; // Double free
+        if (page_index < first_allocatable_page || !mark_page_free(page_index)) {
+            return false; // Reserved page, invalid page, or double free
         }
 
-        set_page_allocated(page_index, false);
+        if (page_index < next_free_hint) {
+            next_free_hint = page_index;
+        }
+
+        return true;
     }
 
     size_t total_pages() {
@@ -112,17 +162,10 @@ namespace pmm {
     }
 
     size_t free_pages() {
-        size_t count = 0;
-        for (size_t i = 0; i < total_page_count; i++) {
-            if (!is_page_allocated(i)) {
-                count++;
-            }
-        }
-
-        return count;
+        return total_page_count - allocated_page_count;
     }
 
     size_t used_pages() {
-        return total_page_count - free_pages();
+        return allocated_page_count;
     }
 }

@@ -14,8 +14,8 @@ namespace pmm {
 
     void* alloc_zeroed_page(); // Allocate a page and clear it to zero
 
-    void free_page(void* page); 
-    // Free a previously allocated page of physical memory
+    bool free_page(void* page);
+    // Free a previously allocated page of physical memory. Returns false for invalid or double frees.
 
     size_t total_pages(); // Total pages managed by the PMM
 
