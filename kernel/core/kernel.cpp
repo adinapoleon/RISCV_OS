@@ -22,6 +22,13 @@ static void print_pmm_stats(Uart& uart) {
     uart.print_str("\n");
 }
 
+static bool print_check(Uart& uart, const char* name, bool passed) {
+    uart.print_str(passed ? "[OK] " : "[FAIL] ");
+    uart.print_str(name);
+    uart.print_str("\n");
+    return passed;
+}
+
 static bool init_memory(Uart& uart) {
     uart.print_str("\n\n--- Testing Physical Memory Manager ---\n");
 
@@ -42,7 +49,10 @@ static bool init_memory(Uart& uart) {
     return true;
 }
 
-static void run_pmm_smoke_test(Uart& uart) {
+static bool run_pmm_smoke_test(Uart& uart) {
+    bool passed = true;
+    size_t initial_free_pages = pmm::free_pages();
+
     uart.print_str("\nAllocating single page of memory...\n");
     void* page1 = pmm::alloc_page();
     if (page1) {
@@ -53,10 +63,14 @@ static void run_pmm_smoke_test(Uart& uart) {
         uart.print_str("Failed to allocate page!\n");
     }
     print_pmm_stats(uart);
+    passed = print_check(uart, "alloc_page returns a page", page1 != nullptr) && passed;
+    passed = print_check(uart, "allocated page is 4KB-aligned", ((uintptr_t)page1 % pmm::PAGE_SIZE) == 0) && passed;
+    passed = print_check(uart, "alloc_page consumes one free page", pmm::free_pages() == initial_free_pages - 1) && passed;
 
     uart.print_str("\nFreeing the allocated page...\n");
     pmm::free_page(page1);
     print_pmm_stats(uart);
+    passed = print_check(uart, "free_page restores the free count", pmm::free_pages() == initial_free_pages) && passed;
 
     uart.print_str("\nTrying to allocate another page after freeing...\n");
     void* page2 = pmm::alloc_page();
@@ -68,8 +82,15 @@ static void run_pmm_smoke_test(Uart& uart) {
         uart.print_str("Failed to allocate page!\n");
     }
     print_pmm_stats(uart);
+    passed = print_check(uart, "allocator reuses the freed page", page2 == page1) && passed;
 
-    uart.print_str("\nMemory bring-up complete.\n");
+    uart.print_str("\nFreeing the reused page...\n");
+    pmm::free_page(page2);
+    print_pmm_stats(uart);
+    passed = print_check(uart, "PMM smoke test leaves no leaked pages", pmm::free_pages() == initial_free_pages) && passed;
+
+    uart.print_str(passed ? "\nPMM smoke test passed.\n" : "\nPMM smoke test failed.\n");
+    return passed;
 }
 
 #if KERNEL_RUN_TRAP_TESTS
@@ -106,8 +127,8 @@ extern "C" void kernel_main() {
     uart.print_str("\n\n--- RISC-V OS Kernel ---\n");
     uart.print_str("Booting supervisor kernel...\n");
 
-    if (init_memory(uart)) {
-        run_pmm_smoke_test(uart);
+    if (init_memory(uart) && run_pmm_smoke_test(uart)) {
+        uart.print_str("\nMemory bring-up complete.\n");
     }
 
 #if KERNEL_RUN_TRAP_TESTS
