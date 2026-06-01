@@ -40,6 +40,8 @@ grep -q "PMM smoke test passed." "$OUTPUT_FILE"
 grep -q "VMM smoke test passed." "$OUTPUT_FILE"
 grep -q "Sv32 paging enabled" "$OUTPUT_FILE"
 grep -q "S-mode privilege verified." "$OUTPUT_FILE"
+grep -q "Timer tick" "$OUTPUT_FILE"
+grep -q "Timer smoke test passed." "$OUTPUT_FILE"
 grep -q "Memory bring-up complete." "$OUTPUT_FILE"
 grep -q "Kernel idle." "$OUTPUT_FILE"
 

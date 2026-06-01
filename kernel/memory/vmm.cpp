@@ -8,6 +8,8 @@ extern "C" char _ram_end;
 namespace vmm {
     constexpr uintptr_t UART_BASE = 0x10000000;
     constexpr uintptr_t UART_SIZE = PAGE_SIZE;
+    constexpr uintptr_t CLINT_BASE = 0x02000000;
+    constexpr uintptr_t CLINT_SIZE = 0x10000;
 
     static PageTable* kernel_root_table = nullptr;
 
@@ -86,6 +88,10 @@ namespace vmm {
         return map_identity_range(
             UART_BASE,
             UART_BASE + UART_SIZE,
+            PTE_R | PTE_W | PTE_G
+        ) && map_identity_range(
+            CLINT_BASE,
+            CLINT_BASE + CLINT_SIZE,
             PTE_R | PTE_W | PTE_G
         );
     }

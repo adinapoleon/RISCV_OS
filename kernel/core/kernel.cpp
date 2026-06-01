@@ -1,3 +1,4 @@
+#include "arch/riscv/timer.h"
 #include "drivers/uart.h"
 #include "memory/pmm.h"
 #include "memory/vmm.h"
@@ -182,6 +183,22 @@ static bool verify_supervisor_mode(Uart& uart) {
     return passed;
 }
 
+static bool run_timer_smoke_test(Uart& uart) {
+    uart.print_str("\n--- Testing CLINT Timer Interrupts ---\n");
+
+    timer::start(100000);
+    while (timer::ticks() < 3) {
+        asm volatile("nop");
+    }
+
+    bool passed = print_check(uart, "CLINT timer fired recurring ticks", timer::ticks() >= 3);
+    if (passed) {
+        uart.print_str("Timer smoke test passed.\n");
+    }
+
+    return passed;
+}
+
 #if KERNEL_RUN_TRAP_TESTS
 static void run_trap_smoke_tests(Uart& uart) {
     uart.print_str("\n\n--- Testing illegal instruction exception ---\n");
@@ -220,7 +237,8 @@ extern "C" void kernel_main() {
         && run_pmm_smoke_test(uart)
         && run_vmm_smoke_test(uart)
         && enable_virtual_memory(uart)
-        && verify_supervisor_mode(uart)) {
+        && verify_supervisor_mode(uart)
+        && run_timer_smoke_test(uart)) {
         uart.print_str("\nMemory bring-up complete.\n");
     }
 

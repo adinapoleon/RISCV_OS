@@ -1,6 +1,8 @@
 #include "trap/trap.h"
 #include "drivers/uart.h"
 
+extern "C" void machine_timer_tick();
+
 namespace {
 volatile bool privilege_probe_active = false;
 volatile bool privilege_probe_observed = false;
@@ -147,6 +149,14 @@ extern "C" void supervisor_trap_handler(uint32_t scause, uint32_t sepc, uint32_t
 
 extern "C" void machine_trap_handler(uint32_t mcause, uint32_t mepc, uint32_t mtval, TrapFrame* frame) {
     (void)frame;
+    bool is_interrupt = (mcause >> 31) & 1;
+    uint32_t code = mcause & 0x7FFFFFFF;
+
+    if (is_interrupt && code == static_cast<uint32_t>(InterruptCode::MachineTimerInterrupt)) {
+        machine_timer_tick();
+        return;
+    }
+
     Uart uart;
     uart.print_str("[M-MODE TRAP] cause=");
     uart.print_hex(mcause);
