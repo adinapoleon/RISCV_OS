@@ -15,7 +15,7 @@ TARGET = kernel.elf
 
 OBJS = boot.o m_mode.o entry.o trap_entry.o timer.o uart.o syscall.o trap.o mem.o pmm.o vmm.o kernel.o
 
-.PHONY: all help run qemu qemu-gdb smoke clean
+.PHONY: all help run smoke clean
 
 all: $(TARGET)
 
@@ -23,8 +23,6 @@ help:
 	@echo "RISC-V OS build targets:"
 	@echo "  make            Build $(TARGET)"
 	@echo "  make run        Boot $(TARGET) in QEMU"
-	@echo "  make qemu       Alias for make run"
-	@echo "  make qemu-gdb   Boot QEMU stopped with GDB server on :1234"
 	@echo "  make smoke      Run the QEMU smoke test"
 	@echo "  make clean      Remove build artifacts"
 
@@ -69,11 +67,6 @@ kernel.o: kernel/core/kernel.cpp kernel/drivers/uart.h kernel/memory/pmm.h kerne
 
 run: $(TARGET)
 	qemu-system-riscv32 -machine virt -nographic -bios none -kernel $(TARGET)
-
-qemu: run
-
-qemu-gdb: $(TARGET)
-	qemu-system-riscv32 -machine virt -nographic -bios none -kernel $(TARGET) -s -S
 
 smoke: $(TARGET)
 	./scripts/smoke.sh $(TARGET)
