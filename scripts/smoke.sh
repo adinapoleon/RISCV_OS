@@ -37,6 +37,7 @@ if grep -q "\[FAIL\]" "$OUTPUT_FILE"; then
 fi
 
 grep -q "PMM smoke test passed." "$OUTPUT_FILE"
+grep -q "VMM smoke test passed." "$OUTPUT_FILE"
 grep -q "Memory bring-up complete." "$OUTPUT_FILE"
 grep -q "Kernel idle." "$OUTPUT_FILE"
 

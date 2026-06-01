@@ -120,6 +120,39 @@ static bool run_pmm_smoke_test(Uart& uart) {
     return passed;
 }
 
+static bool run_vmm_smoke_test(Uart& uart) {
+    bool passed = true;
+    constexpr uintptr_t test_va = 0x40000000;
+    constexpr uint32_t map_flags = vmm::PTE_R | vmm::PTE_W;
+
+    uart.print_str("\n--- Testing Sv32 Virtual Memory Manager ---\n");
+
+    void* physical_page = pmm::alloc_page();
+    passed = print_check(uart, "VMM smoke physical page allocation", physical_page != nullptr) && passed;
+    if (physical_page == nullptr) {
+        return false;
+    }
+
+    uintptr_t translated = 0;
+    bool mapped = vmm::vm_map(test_va, reinterpret_cast<uintptr_t>(physical_page), map_flags);
+    passed = print_check(uart, "vm_map creates a high virtual mapping", mapped) && passed;
+    passed = print_check(uart, "vm_map rejects duplicate mappings", !vmm::vm_map(test_va, reinterpret_cast<uintptr_t>(physical_page), map_flags)) && passed;
+    passed = print_check(uart, "translate resolves mapped address",
+                         vmm::translate(test_va + 0x123, &translated)
+                         && translated == reinterpret_cast<uintptr_t>(physical_page) + 0x123) && passed;
+
+    bool unmapped = vmm::vm_unmap(test_va);
+    passed = print_check(uart, "vm_unmap removes mapped address", unmapped) && passed;
+    passed = print_check(uart, "translate rejects unmapped address", !vmm::translate(test_va, &translated)) && passed;
+    passed = print_check(uart, "vm_unmap rejects missing mappings", !vmm::vm_unmap(test_va)) && passed;
+
+    bool freed_physical = pmm::free_page(physical_page);
+    passed = print_check(uart, "VMM smoke frees physical page", freed_physical) && passed;
+
+    uart.print_str(passed ? "\nVMM smoke test passed.\n" : "\nVMM smoke test failed.\n");
+    return passed;
+}
+
 #if KERNEL_RUN_TRAP_TESTS
 static void run_trap_smoke_tests(Uart& uart) {
     uart.print_str("\n\n--- Testing illegal instruction exception ---\n");
@@ -154,7 +187,7 @@ extern "C" void kernel_main() {
     uart.print_str("\n\n--- RISC-V OS Kernel ---\n");
     uart.print_str("Booting supervisor kernel...\n");
 
-    if (init_memory(uart) && run_pmm_smoke_test(uart)) {
+    if (init_memory(uart) && run_pmm_smoke_test(uart) && run_vmm_smoke_test(uart)) {
         uart.print_str("\nMemory bring-up complete.\n");
     }
 

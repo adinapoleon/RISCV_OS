@@ -28,6 +28,9 @@ namespace vmm {
 
     bool init();
     uintptr_t root_table_address();
+    bool vm_map(uintptr_t va, uintptr_t pa, uint32_t flags);
+    bool vm_unmap(uintptr_t va);
+    bool translate(uintptr_t va, uintptr_t* pa);
 
     constexpr uint32_t vpn0(uintptr_t va) {
         return (va >> 12) & 0x3FF;
