@@ -1,6 +1,7 @@
 #include "drivers/uart.h"
 #include "memory/pmm.h"
 #include "memory/vmm.h"
+#include "trap/trap.h"
 
 namespace {
 
@@ -167,6 +168,20 @@ static bool enable_virtual_memory(Uart& uart) {
     return passed;
 }
 
+static bool verify_supervisor_mode(Uart& uart) {
+    uart.print_str("\n--- Verifying S-mode Privilege ---\n");
+
+    trap::begin_privilege_probe();
+    asm volatile("csrr t0, mstatus" ::: "t0", "memory");
+
+    bool passed = print_check(uart, "M-mode CSR access traps in S-mode", trap::privilege_probe_trapped());
+    if (passed) {
+        uart.print_str("S-mode privilege verified.\n");
+    }
+
+    return passed;
+}
+
 #if KERNEL_RUN_TRAP_TESTS
 static void run_trap_smoke_tests(Uart& uart) {
     uart.print_str("\n\n--- Testing illegal instruction exception ---\n");
@@ -201,7 +216,11 @@ extern "C" void kernel_main() {
     uart.print_str("\n\n--- RISC-V OS Kernel ---\n");
     uart.print_str("Booting supervisor kernel...\n");
 
-    if (init_memory(uart) && run_pmm_smoke_test(uart) && run_vmm_smoke_test(uart) && enable_virtual_memory(uart)) {
+    if (init_memory(uart)
+        && run_pmm_smoke_test(uart)
+        && run_vmm_smoke_test(uart)
+        && enable_virtual_memory(uart)
+        && verify_supervisor_mode(uart)) {
         uart.print_str("\nMemory bring-up complete.\n");
     }
 

@@ -1,6 +1,22 @@
 #include "trap/trap.h"
 #include "drivers/uart.h"
 
+namespace {
+volatile bool privilege_probe_active = false;
+volatile bool privilege_probe_observed = false;
+}
+
+namespace trap {
+    void begin_privilege_probe() {
+        privilege_probe_active = true;
+        privilege_probe_observed = false;
+    }
+
+    bool privilege_probe_trapped() {
+        return privilege_probe_observed;
+    }
+}
+
 static void advance_sepc() {
     asm volatile(
         "csrr t0, sepc\n"
@@ -73,6 +89,10 @@ void handle_exception(uint32_t code, uint32_t epc, uint32_t tval, TrapFrame* fra
     switch (static_cast<ExceptionCode>(code)) {
         case ExceptionCode::IllegalInstruction:
             uart.print_str("[EXCEPTION] Illegal Instruction\n");
+            if (privilege_probe_active) {
+                privilege_probe_observed = true;
+                privilege_probe_active = false;
+            }
             advance_sepc();
             break;
 

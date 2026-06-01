@@ -36,6 +36,11 @@ enum class InterruptCode : uint32_t {
 void handle_interrupt(uint32_t code, uint32_t epc, uint32_t tval, TrapFrame* frame);
 void handle_exception(uint32_t code, uint32_t epc, uint32_t tval, TrapFrame* frame);
 
+namespace trap {
+    void begin_privilege_probe();
+    bool privilege_probe_trapped();
+}
+
 // Trap dispatchers.
 extern "C" void supervisor_trap_handler(uint32_t scause, uint32_t sepc, uint32_t stval, TrapFrame* frame);
 extern "C" void machine_trap_handler(uint32_t mcause, uint32_t mepc, uint32_t mtval, TrapFrame* frame);
