@@ -20,7 +20,7 @@ machine_init:
     csrw pmpcfg0, t0
 
     # Delegate common synchronous exceptions to S-mode.
-    li t0, 0xB1FF
+    li t0, 0xB3FF
     csrw medeleg, t0
 
     # Delegate supervisor software/timer/external interrupt causes.

@@ -1,4 +1,5 @@
 #include "trap/trap.h"
+#include "trap/syscall.h"
 #include "drivers/uart.h"
 
 extern "C" void machine_timer_tick();
@@ -115,8 +116,12 @@ void handle_exception(uint32_t code, uint32_t epc, uint32_t tval, TrapFrame* fra
 
         case ExceptionCode::EnvironmentCallFromUMode:
         case ExceptionCode::EnvironmentCallFromSMode:
+            syscall::handle(frame);
+            advance_sepc();
+            break;
+
         case ExceptionCode::EnvironmentCallFromMMode:
-            uart.print_str("[EXCEPTION] Environment Call\n");
+            uart.print_str("[EXCEPTION] Environment Call from M-mode\n");
             advance_sepc();
             break;
 

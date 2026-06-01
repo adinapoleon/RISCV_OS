@@ -13,7 +13,7 @@ LDFLAGS = $(ARCH_FLAGS) -T scripts/linker.ld -nostdlib -nostartfiles -Wl,-melf32
 
 TARGET = kernel.elf
 
-OBJS = boot.o m_mode.o entry.o trap_entry.o timer.o uart.o trap.o mem.o pmm.o vmm.o kernel.o
+OBJS = boot.o m_mode.o entry.o trap_entry.o timer.o uart.o syscall.o trap.o mem.o pmm.o vmm.o kernel.o
 
 all: $(TARGET)
 
@@ -40,6 +40,9 @@ uart.o: kernel/drivers/uart.cpp kernel/drivers/uart.h
 
 trap.o: kernel/trap/trap.cpp kernel/trap/trap.h kernel/drivers/uart.h
 	$(CXX) $(CXXFLAGS) -c kernel/trap/trap.cpp -o trap.o
+
+syscall.o: kernel/trap/syscall.cpp kernel/trap/syscall.h kernel/trap/trap.h kernel/drivers/uart.h
+	$(CXX) $(CXXFLAGS) -c kernel/trap/syscall.cpp -o syscall.o
 
 mem.o: kernel/memory/mem.cpp kernel/memory/mem.h
 	$(CXX) $(CXXFLAGS) -c kernel/memory/mem.cpp -o mem.o

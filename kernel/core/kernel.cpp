@@ -2,6 +2,7 @@
 #include "drivers/uart.h"
 #include "memory/pmm.h"
 #include "memory/vmm.h"
+#include "trap/syscall.h"
 #include "trap/trap.h"
 
 namespace {
@@ -199,6 +200,27 @@ static bool run_timer_smoke_test(Uart& uart) {
     return passed;
 }
 
+static bool run_syscall_smoke_test(Uart& uart) {
+    uart.print_str("\n--- Testing Syscall Interface ---\n");
+
+    register uint32_t putchar_arg asm("a0") = '!';
+    register uint32_t putchar_num asm("a7") = syscall::SYS_putchar;
+    asm volatile("ecall" : "+r"(putchar_arg) : "r"(putchar_num) : "memory");
+    uart.print_str("\n");
+
+    register uint32_t exit_arg asm("a0") = 42;
+    register uint32_t exit_num asm("a7") = syscall::SYS_exit;
+    asm volatile("ecall" : "+r"(exit_arg) : "r"(exit_num) : "memory");
+
+    bool passed = print_check(uart, "SYS_exit records exit status",
+                              syscall::exit_requested() && syscall::exit_code() == 42);
+    if (passed) {
+        uart.print_str("Syscall smoke test passed.\n");
+    }
+
+    return passed;
+}
+
 #if KERNEL_RUN_TRAP_TESTS
 static void run_trap_smoke_tests(Uart& uart) {
     uart.print_str("\n\n--- Testing illegal instruction exception ---\n");
@@ -238,7 +260,8 @@ extern "C" void kernel_main() {
         && run_vmm_smoke_test(uart)
         && enable_virtual_memory(uart)
         && verify_supervisor_mode(uart)
-        && run_timer_smoke_test(uart)) {
+        && run_timer_smoke_test(uart)
+        && run_syscall_smoke_test(uart)) {
         uart.print_str("\nMemory bring-up complete.\n");
     }
 
