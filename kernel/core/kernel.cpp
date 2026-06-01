@@ -33,7 +33,7 @@ static bool init_memory(Uart& uart) {
     pmm::init_after_kernel(reinterpret_cast<uintptr_t>(&_ram_end));
     print_pmm_stats(uart);
 
-    uart.print_str("\n--- Initializing Virtual Memory Scaffold ---\n");
+    uart.print_str("\n--- Initializing Virtual Memory Manager ---\n");
     if (vmm::init()) {
         uart.print_str("Allocated Sv32 root page table at: ");
         uart.print_hex(vmm::root_table_address());
@@ -153,6 +153,20 @@ static bool run_vmm_smoke_test(Uart& uart) {
     return passed;
 }
 
+static bool enable_virtual_memory(Uart& uart) {
+    uart.print_str("\n--- Enabling Sv32 Paging ---\n");
+    vmm::enable_paging();
+
+    bool passed = print_check(uart, "satp reports Sv32 mode", vmm::paging_enabled());
+    if (passed) {
+        uart.print_str("Sv32 paging enabled with satp=");
+        uart.print_hex(vmm::satp_value());
+        uart.print_str("\n");
+    }
+
+    return passed;
+}
+
 #if KERNEL_RUN_TRAP_TESTS
 static void run_trap_smoke_tests(Uart& uart) {
     uart.print_str("\n\n--- Testing illegal instruction exception ---\n");
@@ -187,7 +201,7 @@ extern "C" void kernel_main() {
     uart.print_str("\n\n--- RISC-V OS Kernel ---\n");
     uart.print_str("Booting supervisor kernel...\n");
 
-    if (init_memory(uart) && run_pmm_smoke_test(uart) && run_vmm_smoke_test(uart)) {
+    if (init_memory(uart) && run_pmm_smoke_test(uart) && run_vmm_smoke_test(uart) && enable_virtual_memory(uart)) {
         uart.print_str("\nMemory bring-up complete.\n");
     }
 

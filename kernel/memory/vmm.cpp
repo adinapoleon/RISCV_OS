@@ -6,6 +6,9 @@ extern "C" char _ram_start;
 extern "C" char _ram_end;
 
 namespace vmm {
+    constexpr uintptr_t UART_BASE = 0x10000000;
+    constexpr uintptr_t UART_SIZE = PAGE_SIZE;
+
     static PageTable* kernel_root_table = nullptr;
 
     static bool is_page_aligned(uintptr_t address) {
@@ -42,6 +45,16 @@ namespace vmm {
         asm volatile("sfence.vma" ::: "memory");
     }
 
+    static void write_satp(uint32_t value) {
+        asm volatile("csrw satp, %0" : : "r"(value) : "memory");
+    }
+
+    static uint32_t read_satp() {
+        uint32_t value = 0;
+        asm volatile("csrr %0, satp" : "=r"(value));
+        return value;
+    }
+
     static PageTable* table_from_pte(pte_t pte) {
         return reinterpret_cast<PageTable*>(pte_address(pte));
     }
@@ -62,10 +75,18 @@ namespace vmm {
             return false;
         }
 
-        return map_identity_range(
+        if (!map_identity_range(
             reinterpret_cast<uintptr_t>(&_ram_start),
             reinterpret_cast<uintptr_t>(&_ram_end),
             PTE_R | PTE_W | PTE_X | PTE_G
+        )) {
+            return false;
+        }
+
+        return map_identity_range(
+            UART_BASE,
+            UART_BASE + UART_SIZE,
+            PTE_R | PTE_W | PTE_G
         );
     }
 
@@ -151,5 +172,23 @@ namespace vmm {
 
         *pa = pte_address(leaf_pte) | page_offset(va);
         return true;
+    }
+
+    void enable_paging() {
+        if (kernel_root_table == nullptr) {
+            return;
+        }
+
+        uint32_t root_ppn = root_table_address() >> 12;
+        write_satp(SATP_MODE_SV32 | root_ppn);
+        flush_tlb();
+    }
+
+    bool paging_enabled() {
+        return (satp_value() & SATP_MODE_SV32) != 0;
+    }
+
+    uint32_t satp_value() {
+        return read_satp();
     }
 }
